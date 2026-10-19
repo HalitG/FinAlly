@@ -1,6 +1,6 @@
 # Market Data Backend — Summary
 
-**Status:** Complete, tested, reviewed. Updated 2026-10-20 with the PLAN.md §13 / REVIEW.md fixes (see "Second Round" below). Full design and code: `planning/MARKET_DATA_DESIGN.md`.
+**Status:** Complete, tested, reviewed. Updated 2026-10-20 with the PLAN.md §13 / REVIEW.md fixes (see "Second Round" below). Full design and code: `planning/archive/MARKET_DATA_DESIGN.md`; research in `archive/MASSIVE_API.md`, `archive/MARKET_INTERFACE.md`, `archive/MARKET_SIMULATOR.md`.
 
 ## What Was Built
 
@@ -80,7 +80,7 @@ A comprehensive code review identified 7 issues. All were resolved:
 
 ## Second Round (2026-10-20)
 
-Implements the market data items from `REVIEW.md` / PLAN.md §13 and the findings in `MARKET_DATA_DESIGN.md`:
+Implements the market data items from `REVIEW.md` / PLAN.md §13 and the findings in `archive/MARKET_DATA_DESIGN.md`:
 
 1. **`open_price`** in the cache and `to_dict()` (B2); resets when a ticker is removed and re-added
 2. **`PriceCache.remove()` bumps `version`** (M2)
