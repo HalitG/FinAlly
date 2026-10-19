@@ -408,7 +408,7 @@ The defaults match the existing code, tests and demo. Change them only with a re
 
 ## 8. Testing
 
-Existing suites: `tests/market/test_simulator.py` (17 tests, math and state) and `test_simulator_source.py` (10, lifecycle and cache). None of them patch the global RNGs, so moving to instance generators breaks nothing. Add:
+Existing suites: `tests/market/test_simulator.py` (19 tests, math and state) and `test_simulator_source.py` (10, lifecycle and cache). None of them patch the global RNGs, so moving to instance generators breaks nothing. Add:
 
 ```python
 def test_same_seed_same_path():

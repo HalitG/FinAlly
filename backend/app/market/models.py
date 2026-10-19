@@ -12,7 +12,8 @@ class PriceUpdate:
 
     ticker: str
     price: float
-    previous_price: float
+    previous_price: float  # Price at the previous cache write (tick-to-tick)
+    open_price: float  # First price the cache saw for this ticker this session
     timestamp: float = field(default_factory=time.time)  # Unix seconds
 
     @property
@@ -37,11 +38,12 @@ class PriceUpdate:
         return "flat"
 
     def to_dict(self) -> dict:
-        """Serialize for JSON / SSE transmission."""
+        """Serialize for JSON / SSE transmission (shape fixed by PLAN.md §6)."""
         return {
             "ticker": self.ticker,
             "price": self.price,
             "previous_price": self.previous_price,
+            "open_price": self.open_price,
             "timestamp": self.timestamp,
             "change": self.change,
             "change_percent": self.change_percent,
