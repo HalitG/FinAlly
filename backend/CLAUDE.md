@@ -61,7 +61,7 @@ uv run --extra dev ruff check app/ tests/ # Lint
 
 ## Integration Example
 
-`app/example_api.py` shows the API layer wired to the market package (ticker validation, watchlist add/remove, trading an unpriced ticker, `TickerTracker`), with an in-memory store standing in for SQLite. See `planning/MARKET_DATA_DESIGN.md` §13 for the production `main.py` shape.
+`app/example_api.py` shows the API layer wired to the market package (ticker validation, watchlist add/remove, trading an unpriced ticker, `TickerTracker`), with an in-memory store standing in for SQLite. See `planning/archive/MARKET_DATA_DESIGN.md` §13 for the production `main.py` shape.
 
 ```bash
 SIM_SEED=42 uv run uvicorn app.example_api:create_app --factory --port 8000
