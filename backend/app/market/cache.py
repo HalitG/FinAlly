@@ -11,31 +11,30 @@ from .models import PriceUpdate
 class PriceCache:
     """Thread-safe in-memory cache of the latest price for each ticker.
 
-    Writers: SimulatorDataSource or MassiveDataSource (one at a time).
-    Readers: SSE streaming endpoint, portfolio valuation, trade execution.
+    Writer: the one active MarketDataSource.
+    Readers: SSE stream, portfolio valuation, trade execution, snapshots, LLM context.
     """
 
     def __init__(self) -> None:
         self._prices: dict[str, PriceUpdate] = {}
         self._lock = Lock()
-        self._version: int = 0  # Monotonically increasing; bumped on every update
+        self._version: int = 0  # Monotonic; bumped on every update and every removal
 
     def update(self, ticker: str, price: float, timestamp: float | None = None) -> PriceUpdate:
         """Record a new price for a ticker. Returns the created PriceUpdate.
 
-        Automatically computes direction and change from the previous price.
-        If this is the first update for the ticker, previous_price == price (direction='flat').
+        The first update for a ticker sets previous_price == open_price == price
+        (direction 'flat'). Later updates carry open_price forward.
         """
         with self._lock:
-            ts = timestamp or time.time()
+            price = round(price, 2)
             prev = self._prices.get(ticker)
-            previous_price = prev.price if prev else price
-
             update = PriceUpdate(
                 ticker=ticker,
-                price=round(price, 2),
-                previous_price=round(previous_price, 2),
-                timestamp=ts,
+                price=price,
+                previous_price=prev.price if prev else price,
+                open_price=prev.open_price if prev else price,
+                timestamp=time.time() if timestamp is None else timestamp,
             )
             self._prices[ticker] = update
             self._version += 1
@@ -57,13 +56,15 @@ class PriceCache:
         return update.price if update else None
 
     def remove(self, ticker: str) -> None:
-        """Remove a ticker from the cache (e.g., when removed from watchlist)."""
+        """Remove a ticker. Bumps version (if it was present) so SSE emits a snapshot
+        without it. A re-added ticker starts a fresh session (new open_price)."""
         with self._lock:
-            self._prices.pop(ticker, None)
+            if self._prices.pop(ticker, None) is not None:
+                self._version += 1
 
     @property
     def version(self) -> int:
-        """Current version counter. Useful for SSE change detection."""
+        """Current version counter, for SSE change detection."""
         return self._version
 
     def __len__(self) -> int:

@@ -14,26 +14,25 @@ from .cache import PriceCache
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/stream", tags=["streaming"])
-
 
 def create_stream_router(price_cache: PriceCache) -> APIRouter:
     """Create the SSE streaming router with a reference to the price cache.
 
-    This factory pattern lets us inject the PriceCache without globals.
+    The router is built per call, so creating the app twice (e.g. in tests)
+    never registers /prices twice on a shared router.
     """
+    router = APIRouter(prefix="/api/stream", tags=["streaming"])
 
     @router.get("/prices")
     async def stream_prices(request: Request) -> StreamingResponse:
         """SSE endpoint for live price updates.
 
-        Streams all tracked ticker prices every ~500ms. The client connects
-        with EventSource and receives events in the format:
+        Each event is a full snapshot of every tracked ticker, keyed by ticker:
 
             data: {"AAPL": {"ticker": "AAPL", "price": 190.50, ...}, ...}
 
-        Includes a retry directive so the browser auto-reconnects on
-        disconnection (EventSource built-in behavior).
+        Events are sent only when the cache version changes. Includes a retry
+        directive so the browser auto-reconnects (EventSource built-in behavior).
         """
         return StreamingResponse(
             _generate_events(price_cache, request),
@@ -53,10 +52,11 @@ async def _generate_events(
     request: Request,
     interval: float = 0.5,
 ) -> AsyncGenerator[str, None]:
-    """Async generator that yields SSE-formatted price events.
+    """Async generator that yields SSE-formatted price snapshots.
 
-    Sends all prices every `interval` seconds. Stops when the client
-    disconnects (detected via request.is_disconnected()).
+    Checks the cache every `interval` seconds and emits only when its version
+    has changed. The first snapshot goes out immediately. An empty cache is sent
+    as `{}`: the frontend replaces its state, so silence would leave stale prices.
     """
     # Tell the client to retry after 1 second if the connection drops
     yield "retry: 1000\n\n"
@@ -66,22 +66,13 @@ async def _generate_events(
     logger.info("SSE client connected: %s", client_ip)
 
     try:
-        while True:
-            # Check for client disconnect
-            if await request.is_disconnected():
-                logger.info("SSE client disconnected: %s", client_ip)
-                break
-
+        while not await request.is_disconnected():
             current_version = price_cache.version
             if current_version != last_version:
                 last_version = current_version
-                prices = price_cache.get_all()
-
-                if prices:
-                    data = {ticker: update.to_dict() for ticker, update in prices.items()}
-                    payload = json.dumps(data)
-                    yield f"data: {payload}\n\n"
-
+                data = {ticker: u.to_dict() for ticker, u in price_cache.get_all().items()}
+                yield f"data: {json.dumps(data)}\n\n"
             await asyncio.sleep(interval)
+        logger.info("SSE client disconnected: %s", client_ip)
     except asyncio.CancelledError:
         logger.info("SSE stream cancelled for: %s", client_ip)
